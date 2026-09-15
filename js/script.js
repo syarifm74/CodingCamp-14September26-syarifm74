@@ -6,6 +6,7 @@
 /* ---------- Constants ---------- */
 const STORAGE_KEY            = 'expense_visualizer_transactions';
 const CATEGORIES_STORAGE_KEY = 'expense_visualizer_custom_categories';
+const THEME_STORAGE_KEY      = 'expense_visualizer_theme';  // "light" | "dark"
 
 // Default categories — always present, never deletable
 const DEFAULT_CATEGORIES = ['Food', 'Transport', 'Fun'];
@@ -53,6 +54,11 @@ const monthlyTotalEl      = document.getElementById('monthlyTotal');
 const monthlyCountEl      = document.getElementById('monthlyCount');
 const monthlyBreakdownEl  = document.getElementById('monthlyBreakdown');
 const monthlyEmptyMsgEl   = document.getElementById('monthlyEmptyMsg');
+
+/* ---------- DOM References — Theme ---------- */
+const themeToggleBtn  = document.getElementById('themeToggleBtn');
+const themeIconEl     = themeToggleBtn.querySelector('.theme-icon');
+const themeLabelEl    = themeToggleBtn.querySelector('.theme-label');
 
 /* ============================================================
    HELPERS
@@ -166,6 +172,73 @@ function pickNextColor() {
   });
   if (unused.length > 0) return unused[0];
   return CUSTOM_COLOR_PALETTE[customCategories.length % CUSTOM_COLOR_PALETTE.length];
+}
+
+/* ============================================================
+   THEME — DARK / LIGHT MODE
+   ============================================================ */
+
+/**
+ * Load the saved theme from localStorage.
+ * Returns "light" (default) or "dark".
+ */
+function loadTheme() {
+  return localStorage.getItem(THEME_STORAGE_KEY) || 'light';
+}
+
+/**
+ * Save the current theme preference to localStorage.
+ */
+function saveTheme(theme) {
+  localStorage.setItem(THEME_STORAGE_KEY, theme);
+}
+
+/**
+ * Apply a theme ("light" or "dark") to the page:
+ *  - Sets data-theme attribute on <html>
+ *  - Updates the toggle button icon and label
+ *  - Updates Chart.js legend / tooltip text colours to stay readable
+ */
+function applyTheme(theme) {
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    themeIconEl.textContent  = '☀️';
+    themeLabelEl.textContent = 'Light Mode';
+    themeToggleBtn.setAttribute('aria-label', 'Switch to light mode');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    themeIconEl.textContent  = '🌙';
+    themeLabelEl.textContent = 'Dark Mode';
+    themeToggleBtn.setAttribute('aria-label', 'Switch to dark mode');
+  }
+
+  // Keep chart text readable in the active theme
+  updateChartTheme(theme);
+}
+
+/**
+ * Update Chart.js legend and tooltip text colours to match the active theme.
+ * Called whenever the theme changes and whenever the chart is re-rendered.
+ */
+function updateChartTheme(theme) {
+  if (!expenseChart) return; // chart not created yet — applyTheme on init handles it
+
+  const textColor = theme === 'dark' ? '#94a3b8' : '#64748b'; // matches --color-text-muted
+
+  expenseChart.options.plugins.legend.labels.color = textColor;
+  expenseChart.update('none'); // 'none' skips animation for a snappy theme switch
+}
+
+/**
+ * Toggle between light and dark, persist, and apply.
+ */
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute('data-theme') === 'dark'
+    ? 'dark'
+    : 'light';
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  saveTheme(newTheme);
+  applyTheme(newTheme);
 }
 
 /* ============================================================
@@ -522,6 +595,10 @@ function updateChart() {
     expenseChart.data.datasets[0].backgroundColor = activeColors;
     expenseChart.update();
   } else {
+    // Determine legend text colour based on current theme
+    const isDark    = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+
     expenseChart = new Chart(chartCanvas, {
       type: 'pie',
       data: {
@@ -544,6 +621,7 @@ function updateChart() {
               padding:       16,
               font:          { size: 13 },
               usePointStyle: true,
+              color:         textColor,  // set correct colour at creation time
             },
           },
           tooltip: {
@@ -729,26 +807,32 @@ monthSelectorInput.addEventListener('change', function () {
   updateMonthlySummary();
 });
 
+// --- Theme toggle ---
+themeToggleBtn.addEventListener('click', toggleTheme);
+
 /* ============================================================
    INITIALISATION
    ============================================================ */
 
 /**
  * Bootstrap the application:
- * 1. Load persisted custom categories.
- * 2. Load persisted transactions.
- * 3. Set month selector to current month.
- * 4. Populate category <select> and pills.
- * 5. Render full UI (list + total + chart + monthly summary).
+ * 1. Apply saved theme (before any render so no flash of wrong theme).
+ * 2. Load persisted custom categories.
+ * 3. Load persisted transactions.
+ * 4. Set month selector to current month.
+ * 5. Populate category <select> and pills.
+ * 6. Render full UI (list + total + chart + monthly summary).
  */
 (function init() {
+  // Step 1 — theme first, so the page renders in the right theme immediately
+  applyTheme(loadTheme());
+
   customCategories = loadCustomCategories();
   transactions     = loadTransactions();
 
-  // Default the month selector to the current month
   monthSelectorInput.value = getCurrentYearMonth();
 
   renderCategoryOptions();
   renderCategoryPills();
-  render(); // calls renderTransactions + updateTotal + updateChart + updateMonthlySummary
+  render(); // renderTransactions + updateTotal + updateChart + updateMonthlySummary
 })();

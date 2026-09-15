@@ -9,8 +9,21 @@
   <body>
 
     <header class="app-header">
-      <h1>Expense &amp; Budget Visualizer</h1>
-      <p class="app-subtitle">Track your spending by category</p>
+      <div class="header-inner">
+        <div class="header-text">
+          <h1>Expense &amp; Budget Visualizer</h1>
+          <p class="app-subtitle">Track your spending by category</p>
+        </div>
+        <button
+          type="button"
+          class="btn-theme-toggle"
+          id="themeToggleBtn"
+          aria-label="Switch to dark mode"
+        >
+          <span class="theme-icon" aria-hidden="true">🌙</span>
+          <span class="theme-label">Dark Mode</span>
+        </button>
+      </div>
     </header>
 
     <main class="app-main">
