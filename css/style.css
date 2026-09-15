@@ -583,3 +583,211 @@ body {
     text-align: center;
   }
 }
+
+/* ============================================================
+   Monthly Summary
+   ============================================================ */
+
+/* ---------- Card header row: title + month selector ---------- */
+.monthly-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.month-selector-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.month-selector-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.month-selector-input {
+  padding: 7px 12px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-family: var(--font-base);
+  color: var(--color-text);
+  background: var(--color-bg);
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.month-selector-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+  background: #ffffff;
+}
+
+/* ---------- Stats grid: Total Spent + Transaction count ---------- */
+.monthly-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.monthly-stat-box {
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  text-align: center;
+  border-top: 3px solid var(--color-primary);
+}
+
+.stat-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-size: clamp(1.2rem, 3vw, 1.6rem);
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: -0.5px;
+}
+
+/* ---------- Category breakdown rows ---------- */
+.monthly-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.breakdown-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.breakdown-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.breakdown-category-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Progress bar track */
+.breakdown-bar-wrap {
+  height: 8px;
+  background: var(--color-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+/* Filled portion — width and colour set inline by JS */
+.breakdown-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+  min-width: 2px; /* always visible even for tiny values */
+}
+
+/* Amount + percentage figures */
+.breakdown-figures {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.breakdown-amount {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.breakdown-pct {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* ---------- Empty / no-data message ---------- */
+.monthly-empty-msg {
+  text-align: center;
+  padding: 24px 16px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.monthly-empty-msg.hidden {
+  display: none;
+}
+
+/* ---------- Transaction date label (in transaction list) ---------- */
+.transaction-date {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-left: 6px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 600px) {
+  .monthly-summary-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .breakdown-row {
+    grid-template-columns: 110px 1fr auto;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .monthly-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .breakdown-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .breakdown-bar-wrap {
+    display: none; /* hide bar on very small screens, keep figures */
+  }
+
+  .breakdown-figures {
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+  }
+}

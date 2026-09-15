@@ -25,9 +25,9 @@ const CUSTOM_COLOR_PALETTE = [
 ];
 
 /* ---------- State ---------- */
-let transactions    = [];   // { id, itemName, amount, category }
-let customCategories = [];  // { name, color }
-let expenseChart    = null; // Chart.js instance
+let transactions     = [];   // { id, itemName, amount, category, date }
+let customCategories = [];   // { name, color }
+let expenseChart     = null; // Chart.js instance (global pie chart)
 
 /* ---------- DOM References — MVP ---------- */
 const form            = document.getElementById('transactionForm');
@@ -46,6 +46,13 @@ const newCategoryNameInput  = document.getElementById('newCategoryName');
 const categoryValidationMsg = document.getElementById('categoryValidationMsg');
 const btnAddCategory        = document.getElementById('btnAddCategory');
 const categoryPillsEl       = document.getElementById('categoryPills');
+
+/* ---------- DOM References — Monthly Summary ---------- */
+const monthSelectorInput  = document.getElementById('monthSelector');
+const monthlyTotalEl      = document.getElementById('monthlyTotal');
+const monthlyCountEl      = document.getElementById('monthlyCount');
+const monthlyBreakdownEl  = document.getElementById('monthlyBreakdown');
+const monthlyEmptyMsgEl   = document.getElementById('monthlyEmptyMsg');
 
 /* ============================================================
    HELPERS
@@ -79,6 +86,51 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
 }
 
+/**
+ * Return today's date as an ISO date string "YYYY-MM-DD".
+ * Used to stamp new transactions.
+ */
+function getTodayISO() {
+  const now = new Date();
+  const year  = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day   = String(now.getDate()).padStart(2, '0');
+  return year + '-' + month + '-' + day;
+}
+
+/**
+ * Return the current month as "YYYY-MM" for the month selector default.
+ */
+function getCurrentYearMonth() {
+  const now = new Date();
+  const year  = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return year + '-' + month;
+}
+
+/**
+ * Extract "YYYY-MM" from a transaction's date field.
+ * Returns null if the date is missing or invalid (backward compatibility).
+ */
+function getYearMonth(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  // dateStr format is "YYYY-MM-DD" — take the first 7 characters
+  const ym = dateStr.substring(0, 7);
+  // Validate: must match YYYY-MM pattern
+  if (!/^\d{4}-\d{2}$/.test(ym)) return null;
+  return ym;
+}
+
+/**
+ * Format a "YYYY-MM" string into a readable label like "September 2026".
+ */
+function formatYearMonth(ym) {
+  if (!ym) return 'Unknown';
+  // Parse as first day of that month in UTC to avoid timezone shifts
+  const date = new Date(ym + '-01T00:00:00Z');
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', timeZone: 'UTC' });
+}
+
 /* ============================================================
    CATEGORY HELPERS
    ============================================================ */
@@ -93,7 +145,7 @@ function getAllCategoryNames() {
 
 /**
  * Look up the display colour for any category name.
- * Falls back to a neutral grey for unknown categories.
+ * Falls back to a neutral grey for unknown/deleted categories.
  */
 function getCategoryColor(name) {
   if (DEFAULT_CATEGORY_COLORS[name]) {
@@ -113,7 +165,6 @@ function pickNextColor() {
     return !usedColors.includes(c);
   });
   if (unused.length > 0) return unused[0];
-  // All colours used — cycle back using index
   return CUSTOM_COLOR_PALETTE[customCategories.length % CUSTOM_COLOR_PALETTE.length];
 }
 
@@ -143,10 +194,6 @@ function saveTransactions() {
    LOCAL STORAGE — CUSTOM CATEGORIES
    ============================================================ */
 
-/**
- * Load custom categories from localStorage.
- * Returns an empty array if nothing is stored yet.
- */
 function loadCustomCategories() {
   try {
     const stored = localStorage.getItem(CATEGORIES_STORAGE_KEY);
@@ -157,9 +204,6 @@ function loadCustomCategories() {
   }
 }
 
-/**
- * Persist the current customCategories array to localStorage.
- */
 function saveCustomCategories() {
   try {
     localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(customCategories));
@@ -201,10 +245,6 @@ function clearValidationMessage() {
    VALIDATION — CATEGORY MANAGER
    ============================================================ */
 
-/**
- * Validate a new category name.
- * Returns { valid: true } or { valid: false, message: string }.
- */
 function validateCategory(name) {
   const trimmed = name.trim();
 
@@ -212,7 +252,6 @@ function validateCategory(name) {
     return { valid: false, message: 'Category name cannot be empty.' };
   }
 
-  // Case-insensitive duplicate check across defaults AND custom categories
   const allNames = getAllCategoryNames().map(function (n) {
     return n.toLowerCase();
   });
@@ -236,9 +275,6 @@ function clearCategoryValidationMessage() {
    ADD / DELETE CUSTOM CATEGORIES
    ============================================================ */
 
-/**
- * Add a new custom category, persist, and update the UI.
- */
 function addCategory(name) {
   const result = validateCategory(name);
 
@@ -255,22 +291,13 @@ function addCategory(name) {
   });
 
   saveCustomCategories();
-
-  // Refresh everything that depends on the category list
   renderCategoryOptions();
   renderCategoryPills();
-  updateChart(); // chart data hasn't changed, but config may need new colour
+  updateChart();
 }
 
-/**
- * Delete a custom category by name.
- * Refuses to delete default categories (safety guard).
- * Note: existing transactions that used this category are NOT deleted —
- * they remain in the list and still count toward totals/chart
- * (the chart will auto-assign a fallback colour).
- */
 function deleteCategory(name) {
-  if (DEFAULT_CATEGORIES.includes(name)) return; // guard
+  if (DEFAULT_CATEGORIES.includes(name)) return;
 
   customCategories = customCategories.filter(function (c) {
     return c.name !== name;
@@ -283,17 +310,12 @@ function deleteCategory(name) {
 }
 
 /* ============================================================
-   RENDER — CATEGORY SELECTOR (transaction form <select>)
+   RENDER — CATEGORY SELECTOR
    ============================================================ */
 
-/**
- * Rebuild the <select> options to reflect defaults + custom categories.
- * Preserves the currently selected value where possible.
- */
 function renderCategoryOptions() {
   const currentValue = categorySelect.value;
 
-  // Remove all options except the placeholder (first option)
   while (categorySelect.options.length > 1) {
     categorySelect.remove(1);
   }
@@ -305,21 +327,15 @@ function renderCategoryOptions() {
     categorySelect.appendChild(option);
   });
 
-  // Restore previous selection if it still exists
   if (currentValue && getAllCategoryNames().includes(currentValue)) {
     categorySelect.value = currentValue;
   }
 }
 
 /* ============================================================
-   RENDER — CATEGORY PILLS (category manager UI)
+   RENDER — CATEGORY PILLS
    ============================================================ */
 
-/**
- * Render the list of category pills inside the manager card.
- * Default categories show a lock icon and no delete button.
- * Custom categories show a delete (×) button.
- */
 function renderCategoryPills() {
   categoryPillsEl.innerHTML = '';
 
@@ -354,15 +370,19 @@ function renderCategoryPills() {
 }
 
 /* ============================================================
-   ADD / DELETE TRANSACTIONS (MVP — unchanged logic)
+   ADD / DELETE TRANSACTIONS
    ============================================================ */
 
+/**
+ * Create a new transaction with an automatic date stamp (today).
+ */
 function addTransaction(itemName, amount, category) {
   const transaction = {
     id:       generateId(),
     itemName: itemName.trim(),
     amount:   parseFloat(parseFloat(amount).toFixed(2)),
     category: category,
+    date:     getTodayISO(),   // "YYYY-MM-DD" — added for Monthly Summary
   };
 
   transactions.push(transaction);
@@ -387,11 +407,12 @@ function render() {
   renderTransactions();
   updateTotal();
   updateChart();
+  updateMonthlySummary(); // keep summary in sync with every state change
 }
 
 /**
- * Render the transaction list. Shows/hides empty state.
- * Works with any category name (default or custom).
+ * Render the full transaction list (all transactions, not filtered).
+ * Each item shows its date for transparency.
  */
 function renderTransactions() {
   transactionList.innerHTML = '';
@@ -403,14 +424,14 @@ function renderTransactions() {
 
   emptyState.classList.add('hidden');
 
-  // Newest first
   transactions.slice().reverse().forEach(function (t) {
-    const color = getCategoryColor(t.category);
+    const color   = getCategoryColor(t.category);
+    // Format date for display — handle missing date gracefully
+    const dateLabel = t.date ? formatDateDisplay(t.date) : '';
 
     const item = document.createElement('div');
     item.className = 'transaction-item';
     item.setAttribute('data-category', t.category);
-    // Apply colour via inline custom property so any category gets a colour
     item.style.setProperty('--item-accent', color);
 
     item.innerHTML = `
@@ -418,6 +439,7 @@ function renderTransactions() {
         <div class="transaction-name">${escapeHtml(t.itemName)}</div>
         <div class="transaction-meta">
           <span class="badge" style="background:${color};">${escapeHtml(t.category)}</span>
+          ${dateLabel ? '<span class="transaction-date">' + escapeHtml(dateLabel) + '</span>' : ''}
         </div>
       </div>
       <div class="transaction-amount">${formatCurrency(t.amount)}</div>
@@ -432,7 +454,18 @@ function renderTransactions() {
   });
 }
 
-/** Recalculate and display total spending. */
+/**
+ * Format an ISO date string "YYYY-MM-DD" into a short readable label
+ * like "16 Sep 2026". Returns empty string on invalid input.
+ */
+function formatDateDisplay(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr + 'T00:00:00');
+  if (isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Recalculate and display total spending (all transactions). */
 function updateTotal() {
   const total = transactions.reduce(function (sum, t) {
     return sum + t.amount;
@@ -441,19 +474,16 @@ function updateTotal() {
 }
 
 /**
- * Build or update the Chart.js pie chart.
- * Dynamically supports any number of categories.
+ * Build or update the global Chart.js pie chart (all transactions).
+ * Unchanged from Optional Challenge #1.
  */
 function updateChart() {
-  // Aggregate totals per category (all categories, not just defaults)
   const totalsMap = {};
 
   getAllCategoryNames().forEach(function (name) {
     totalsMap[name] = 0;
   });
 
-  // Also include categories from existing transactions that may have been
-  // deleted from the manager — so data is never silently lost
   transactions.forEach(function (t) {
     if (totalsMap[t.category] === undefined) {
       totalsMap[t.category] = 0;
@@ -461,7 +491,6 @@ function updateChart() {
     totalsMap[t.category] += t.amount;
   });
 
-  // Build chart arrays — only include categories that have spend > 0
   const activeLabels = [];
   const activeData   = [];
   const activeColors = [];
@@ -488,10 +517,9 @@ function updateChart() {
   chartEmptyMsg.classList.add('hidden');
 
   if (expenseChart) {
-    // Update in place — replace labels, data, and colours together
-    expenseChart.data.labels                        = activeLabels;
-    expenseChart.data.datasets[0].data              = activeData;
-    expenseChart.data.datasets[0].backgroundColor   = activeColors;
+    expenseChart.data.labels                      = activeLabels;
+    expenseChart.data.datasets[0].data            = activeData;
+    expenseChart.data.datasets[0].backgroundColor = activeColors;
     expenseChart.update();
   } else {
     expenseChart = new Chart(chartCanvas, {
@@ -537,6 +565,103 @@ function updateChart() {
 }
 
 /* ============================================================
+   MONTHLY SUMMARY
+   ============================================================ */
+
+/**
+ * Filter transactions to only those matching the selected "YYYY-MM".
+ * Transactions with no date field are excluded (backward compatibility —
+ * they are never deleted, just not counted in a monthly view).
+ */
+function getTransactionsForMonth(ym) {
+  return transactions.filter(function (t) {
+    return getYearMonth(t.date) === ym;
+  });
+}
+
+/**
+ * Render the Monthly Summary section for the currently selected month.
+ * Called automatically whenever state changes (add, delete, month change, load).
+ */
+function updateMonthlySummary() {
+  const selectedYM = monthSelectorInput.value; // "YYYY-MM" or "" if not set
+
+  // If the selector has no value yet, nothing to show
+  if (!selectedYM) {
+    monthlyBreakdownEl.innerHTML = '';
+    monthlyTotalEl.textContent   = 'Rp 0';
+    monthlyCountEl.textContent   = '0';
+    monthlyEmptyMsgEl.classList.remove('hidden');
+    return;
+  }
+
+  const monthTransactions = getTransactionsForMonth(selectedYM);
+
+  if (monthTransactions.length === 0) {
+    monthlyBreakdownEl.innerHTML = '';
+    monthlyTotalEl.textContent   = 'Rp 0';
+    monthlyCountEl.textContent   = '0';
+    monthlyEmptyMsgEl.classList.remove('hidden');
+    return;
+  }
+
+  // Hide empty message — we have data
+  monthlyEmptyMsgEl.classList.add('hidden');
+
+  // ---- Calculate totals ----
+  const total = monthTransactions.reduce(function (sum, t) {
+    return sum + t.amount;
+  }, 0);
+
+  monthlyTotalEl.textContent  = formatCurrency(total);
+  monthlyCountEl.textContent  = monthTransactions.length;
+
+  // ---- Category breakdown ----
+  // Aggregate spend per category for this month
+  const categoryTotals = {};
+
+  monthTransactions.forEach(function (t) {
+    if (categoryTotals[t.category] === undefined) {
+      categoryTotals[t.category] = 0;
+    }
+    categoryTotals[t.category] += t.amount;
+  });
+
+  // Sort categories by spend descending
+  const sortedCategories = Object.keys(categoryTotals).sort(function (a, b) {
+    return categoryTotals[b] - categoryTotals[a];
+  });
+
+  // Render breakdown rows
+  monthlyBreakdownEl.innerHTML = '';
+
+  sortedCategories.forEach(function (name) {
+    const catAmount = categoryTotals[name];
+    const pct       = total > 0 ? (catAmount / total) * 100 : 0;
+    const color     = getCategoryColor(name);
+
+    const row = document.createElement('div');
+    row.className = 'breakdown-row';
+
+    row.innerHTML = `
+      <div class="breakdown-label">
+        <span class="breakdown-dot" style="background:${color};"></span>
+        <span class="breakdown-category-name">${escapeHtml(name)}</span>
+      </div>
+      <div class="breakdown-bar-wrap">
+        <div class="breakdown-bar" style="width:${pct.toFixed(1)}%; background:${color};"></div>
+      </div>
+      <div class="breakdown-figures">
+        <span class="breakdown-amount">${formatCurrency(catAmount)}</span>
+        <span class="breakdown-pct">${pct.toFixed(1)}%</span>
+      </div>
+    `;
+
+    monthlyBreakdownEl.appendChild(row);
+  });
+}
+
+/* ============================================================
    EVENT LISTENERS
    ============================================================ */
 
@@ -574,14 +699,13 @@ transactionList.addEventListener('click', function (event) {
   if (id) deleteTransaction(id);
 });
 
-// --- Add custom category button ---
+// --- Add custom category ---
 btnAddCategory.addEventListener('click', function () {
   addCategory(newCategoryNameInput.value);
   newCategoryNameInput.value = '';
   newCategoryNameInput.focus();
 });
 
-// --- Allow pressing Enter in the category name input ---
 newCategoryNameInput.addEventListener('keydown', function (event) {
   if (event.key === 'Enter') {
     event.preventDefault();
@@ -590,15 +714,19 @@ newCategoryNameInput.addEventListener('keydown', function (event) {
   }
 });
 
-// Clear category validation message when user starts typing
 newCategoryNameInput.addEventListener('input', clearCategoryValidationMessage);
 
-// --- Delete custom category (event delegation on pills container) ---
+// --- Delete custom category (event delegation) ---
 categoryPillsEl.addEventListener('click', function (event) {
   const btn = event.target.closest('.btn-delete-category');
   if (!btn) return;
   const name = btn.getAttribute('data-name');
   if (name) deleteCategory(name);
+});
+
+// --- Month selector change ---
+monthSelectorInput.addEventListener('change', function () {
+  updateMonthlySummary();
 });
 
 /* ============================================================
@@ -607,17 +735,20 @@ categoryPillsEl.addEventListener('click', function (event) {
 
 /**
  * Bootstrap the application:
- * 1. Load persisted custom categories from localStorage.
- * 2. Load persisted transactions from localStorage.
- * 3. Populate the category <select> with all categories.
- * 4. Render category pills.
- * 5. Render full UI (list + total + chart).
+ * 1. Load persisted custom categories.
+ * 2. Load persisted transactions.
+ * 3. Set month selector to current month.
+ * 4. Populate category <select> and pills.
+ * 5. Render full UI (list + total + chart + monthly summary).
  */
 (function init() {
   customCategories = loadCustomCategories();
   transactions     = loadTransactions();
 
-  renderCategoryOptions(); // populate <select> before rendering transactions
-  renderCategoryPills();   // populate manager UI
-  render();                // list + total + chart
+  // Default the month selector to the current month
+  monthSelectorInput.value = getCurrentYearMonth();
+
+  renderCategoryOptions();
+  renderCategoryPills();
+  render(); // calls renderTransactions + updateTotal + updateChart + updateMonthlySummary
 })();

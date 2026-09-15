@@ -127,6 +127,40 @@
 
       </section>
 
+      <!-- Monthly Summary -->
+      <section class="card monthly-summary-card" aria-label="Monthly summary">
+        <div class="monthly-summary-header">
+          <h2 class="section-title" style="margin-bottom:0; border-bottom:none;">Monthly Summary</h2>
+          <div class="month-selector-wrap">
+            <label for="monthSelector" class="month-selector-label">Select month</label>
+            <input type="month" id="monthSelector" class="month-selector-input" />
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="monthly-stats-grid" id="monthlyStatsGrid">
+          <div class="monthly-stat-box">
+            <p class="stat-label">Total Spent</p>
+            <p class="stat-value" id="monthlyTotal">Rp 0</p>
+          </div>
+          <div class="monthly-stat-box">
+            <p class="stat-label">Transactions</p>
+            <p class="stat-value" id="monthlyCount">0</p>
+          </div>
+        </div>
+
+        <!-- Category breakdown -->
+        <div class="monthly-breakdown" id="monthlyBreakdown">
+          <!-- Rows rendered by JS -->
+        </div>
+
+        <!-- Empty / no-data state -->
+        <p class="monthly-empty-msg" id="monthlyEmptyMsg">
+          No transactions found for this month.
+        </p>
+
+      </section>
+
     </main>
 
     <footer class="app-footer">
