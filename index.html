@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Expense &amp; Budget Visualizer</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+
+    <header class="app-header">
+      <h1>Expense &amp; Budget Visualizer</h1>
+      <p class="app-subtitle">Track your spending by category</p>
+    </header>
+
+    <main class="app-main">
+
+      <!-- Total Balance Card -->
+      <section class="card balance-card" aria-label="Total spending">
+        <p class="balance-label">Total Spending</p>
+        <p class="balance-amount" id="totalAmount">Rp 0</p>
+      </section>
+
+      <!-- Two-column layout: Form + Chart -->
+      <div class="top-grid">
+
+        <!-- Add Transaction Form -->
+        <section class="card form-card" aria-label="Add transaction">
+          <h2 class="section-title">Add Transaction</h2>
+
+          <form id="transactionForm" novalidate>
+
+            <div class="form-group">
+              <label for="itemName">Item Name</label>
+              <input
+                type="text"
+                id="itemName"
+                name="itemName"
+                placeholder="e.g. Lunch, Bus fare"
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="amount">Amount (Rp)</label>
+              <input
+                type="number"
+                id="amount"
+                name="amount"
+                placeholder="e.g. 25000"
+                min="1"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="category">Category</label>
+              <select id="category" name="category">
+                <option value="">-- Select category --</option>
+                <option value="Food">Food</option>
+                <option value="Transport">Transport</option>
+                <option value="Fun">Fun</option>
+              </select>
+            </div>
+
+            <!-- Validation message -->
+            <p class="validation-msg" id="validationMsg" role="alert" aria-live="polite"></p>
+
+            <button type="submit" class="btn-add">Add Transaction</button>
+
+          </form>
+        </section>
+
+        <!-- Pie Chart -->
+        <section class="card chart-card" aria-label="Spending chart">
+          <h2 class="section-title">Spending by Category</h2>
+          <div class="chart-container">
+            <canvas id="expenseChart" aria-label="Pie chart of spending by category" role="img"></canvas>
+          </div>
+          <p class="chart-empty-msg" id="chartEmptyMsg">No data yet. Add a transaction to see the chart.</p>
+        </section>
+
+      </div>
+
+      <!-- Transaction List -->
+      <section class="card list-card" aria-label="Transaction list">
+        <h2 class="section-title">Transactions</h2>
+
+        <div class="transaction-list" id="transactionList">
+          <!-- Transactions rendered here by JS -->
+        </div>
+
+        <!-- Empty state -->
+        <div class="empty-state" id="emptyState">
+          <p>No transactions yet.</p>
+          <p>Use the form above to add your first expense.</p>
+        </div>
+
+      </section>
+
+    </main>
+
+    <footer class="app-footer">
+      <p>RevoU Fundamental Course &mdash; Mini Coding Project</p>
+    </footer>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <!-- App script -->
+    <script src="js/script.js"></script>
+
+  </body>
+</html>
