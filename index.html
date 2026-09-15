@@ -81,6 +81,36 @@
 
       </div>
 
+      <!-- Category Manager -->
+      <section class="card category-manager-card" aria-label="Manage categories">
+        <h2 class="section-title">Manage Categories</h2>
+
+        <div class="category-manager-body">
+
+          <!-- Add custom category form -->
+          <div class="category-add-row">
+            <div class="category-input-wrap">
+              <label for="newCategoryName" class="sr-only">New category name</label>
+              <input
+                type="text"
+                id="newCategoryName"
+                placeholder="New category name…"
+                autocomplete="off"
+                maxlength="40"
+              />
+              <p class="category-validation-msg" id="categoryValidationMsg" role="alert" aria-live="polite"></p>
+            </div>
+            <button type="button" class="btn-add-category" id="btnAddCategory">+ Add</button>
+          </div>
+
+          <!-- Category pills list -->
+          <div class="category-pills" id="categoryPills">
+            <!-- Rendered by JS -->
+          </div>
+
+        </div>
+      </section>
+
       <!-- Transaction List -->
       <section class="card list-card" aria-label="Transaction list">
         <h2 class="section-title">Transactions</h2>
